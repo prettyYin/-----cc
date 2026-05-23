@@ -1,0 +1,10 @@
+{
+  "states": {
+    "idle":  {"frames": 4, "fps": 6,  "loop": true},
+    "walk":  {"frames": 6, "fps": 10, "loop": true},
+    "sit":   {"frames": 2, "fps": 2,  "loop": true},
+    "sleep": {"frames": 3, "fps": 3,  "loop": true},
+    "happy": {"frames": 5, "fps": 12, "loop": true},
+    "dizzy": {"frames": 4, "fps": 8,  "loop": false}
+  }
+}
