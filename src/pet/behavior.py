@@ -24,19 +24,19 @@ _WALK_DIRECTIONS: list[tuple[int, int]] = [
 
 
 def _idle_duration_ms() -> int:
-    return random.randint(5000, 12000)
+    return random.randint(10000, 20000)
 
 
 def _walk_duration_ms() -> int:
-    return random.randint(4000, 8000)
+    return random.randint(7000, 14000)
 
 
 def _sit_duration_ms() -> int:
-    return random.randint(3000, 6000)
+    return random.randint(6000, 12000)
 
 
 def _sleep_duration_ms() -> int:
-    return random.randint(10000, 18000)
+    return random.randint(18000, 30000)
 
 
 class Behavior(QObject):

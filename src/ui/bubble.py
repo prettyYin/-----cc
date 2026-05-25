@@ -7,6 +7,7 @@ from PySide6.QtCore import (
     QRectF,
     Qt,
     QTimer,
+    Signal,
 )
 from PySide6.QtGui import (
     QBrush,
@@ -106,7 +107,9 @@ class _CloudBubble(QWidget):
 class ReminderBubble(QObject):
     """生命周期：构造时显示 → 5s 后 fadeOut → 销毁。外部用列表持有引用避免 GC。"""
 
-    def __init__(self, text: str, pet_x: int, pet_y: int, pet_size: int = 192) -> None:
+    finished = Signal()
+
+    def __init__(self, text: str, pet_x: int, pet_y: int, pet_size: int = 160) -> None:
         super().__init__()
         screen = QGuiApplication.primaryScreen()
         screen_geo = screen.availableGeometry() if screen is not None else None
@@ -114,6 +117,7 @@ class ReminderBubble(QObject):
         pet_center_x = pet_x + pet_size // 2
         tail_side = "left" if pet_center_x > (screen_geo.center().x() if screen_geo else 800) else "right"
         self._bubble = _CloudBubble(text, tail_side)
+        self._fading_out = False
 
         bubble_x = pet_center_x - self._bubble.width() // 2
         bubble_y = pet_y - self._bubble.height() - 2
@@ -135,12 +139,35 @@ class ReminderBubble(QObject):
 
         QTimer.singleShot(_DISPLAY_MS, self._start_fade_out)
 
-    def _start_fade_out(self) -> None:
+    def update_position(self, pet_x: int, pet_y: int, pet_size: int) -> None:
         if self._bubble is None:
             return
+        screen = QGuiApplication.primaryScreen()
+        screen_geo = screen.availableGeometry() if screen is not None else None
+        pet_center_x = pet_x + pet_size // 2
+        bubble_x = pet_center_x - self._bubble.width() // 2
+        bubble_y = pet_y - self._bubble.height() - 2
+        if screen_geo is not None:
+            bubble_x = max(
+                screen_geo.left() + 4,
+                min(screen_geo.right() - self._bubble.width() - 4, bubble_x),
+            )
+            if bubble_y < screen_geo.top() + 4:
+                bubble_y = pet_y + pet_size + 2
+        self._bubble.move(bubble_x, bubble_y)
+
+    def dismiss(self) -> None:
+        if self._fading_out:
+            return
+        self._start_fade_out()
+
+    def _start_fade_out(self) -> None:
+        if self._bubble is None or self._fading_out:
+            return
+        self._fading_out = True
         self._fade_out = QPropertyAnimation(self._bubble, b"windowOpacity", self)
         self._fade_out.setDuration(_FADE_MS)
-        self._fade_out.setStartValue(1.0)
+        self._fade_out.setStartValue(self._bubble.windowOpacity())
         self._fade_out.setEndValue(0.0)
         self._fade_out.finished.connect(self._cleanup)
         self._fade_out.start()
@@ -150,4 +177,5 @@ class ReminderBubble(QObject):
             self._bubble.close()
             self._bubble.deleteLater()
             self._bubble = None
+        self.finished.emit()
         self.deleteLater()

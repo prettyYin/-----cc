@@ -8,6 +8,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     Qt,
     QTimer,
+    Signal,
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QWidget
@@ -66,6 +67,8 @@ def _hand_pixmap() -> QPixmap:
 
 
 class PettingHand(QObject):
+    finished = Signal()
+
     def __init__(self, head_center_x: int, head_top_y: int) -> None:
         super().__init__()
         self._window = QWidget(
@@ -101,6 +104,9 @@ class PettingHand(QObject):
 
         QTimer.singleShot(_DURATION_MS + 80, self._cleanup)
 
+    def cancel(self) -> None:
+        self._cleanup()
+
     def _cleanup(self) -> None:
         if self._anim is not None:
             self._anim.stop()
@@ -109,4 +115,5 @@ class PettingHand(QObject):
             self._window.close()
             self._window.deleteLater()
             self._window = None
+        self.finished.emit()
         self.deleteLater()

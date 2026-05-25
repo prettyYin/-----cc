@@ -15,7 +15,7 @@ from src.ui.pixel_art import dewhite_pixmap
 
 _DEFAULT_MANIFEST: dict[str, Any] = {
     "states": {
-        "idle":  {"frames": 4, "fps": 6,  "loop": True},
+        "idle":  {"frames": 4, "fps": 3,  "loop": True},
         "walk":  {"frames": 6, "fps": 10, "loop": True},
         "sit":   {"frames": 2, "fps": 2,  "loop": True},
         "sleep": {"frames": 3, "fps": 3,  "loop": True},

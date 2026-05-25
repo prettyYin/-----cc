@@ -6,7 +6,9 @@ import sys
 from PySide6.QtCore import QSharedMemory
 from PySide6.QtWidgets import QApplication
 
-from src.core import autostart, config, fonts
+from src.core import autostart, config, fonts, secrets
+from src.core.idle_chat import IdleChatter
+from src.core.pomodoro import PomodoroController
 from src.core.scheduler import ReminderScheduler
 from src.pet.pet_window import PetWindow
 from src.ui.tray import PetTrayIcon
@@ -26,11 +28,17 @@ def main() -> int:
         return 0
 
     config.load()
+    secrets.migrate_from_config()
     autostart.apply(bool(config.get("autostart", False)))
     fonts.init()
 
     window = PetWindow()
     window.show()
+
+    chatter = IdleChatter()
+    pomodoro = PomodoroController()
+    window.set_companion(chatter, pomodoro)
+    chatter.start()
 
     scheduler = ReminderScheduler()
     scheduler.triggered.connect(window.show_reminder)
@@ -47,6 +55,8 @@ def main() -> int:
 
     exit_code = app.exec()
     scheduler.stop()
+    chatter.stop()
+    pomodoro.stop()
     shared_memory.detach()
     return exit_code
 

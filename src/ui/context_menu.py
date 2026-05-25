@@ -19,6 +19,8 @@ def build_pet_menu(
     on_reminders: Callable[[], None],
     on_settings: Callable[[], None],
     on_quit: Callable[[], None],
+    on_pomodoro_toggle: Callable[[], None] | None = None,
+    pomodoro_running: bool = False,
 ) -> QMenu:
     menu = QMenu(parent)
     menu.setFont(fonts.pixel_font(11))
@@ -34,6 +36,8 @@ def build_pet_menu(
     add("睡觉", on_sleep)
     menu.addSeparator()
     add("聊天", on_chat)
+    if on_pomodoro_toggle is not None:
+        add("⏹ 结束学习陪伴" if pomodoro_running else "🍅 启动学习陪伴", on_pomodoro_toggle)
     add("提醒…", on_reminders)
     add("设置…", on_settings)
     menu.addSeparator()

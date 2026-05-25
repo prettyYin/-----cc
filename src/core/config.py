@@ -23,6 +23,17 @@ DEFAULTS: dict[str, Any] = {
         "model": "",
     },
     "reminders": [],
+    "idle_chat": {
+        "enabled": True,
+        "interval_minutes": 15,
+        "quiet_enabled": False,
+        "quiet_start": "22:00",
+        "quiet_end": "08:00",
+    },
+    "pomodoro": {
+        "enabled": False,
+        "focus_minutes": 25,
+    },
 }
 
 

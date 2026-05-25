@@ -11,6 +11,7 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     Qt,
     QTimer,
+    Signal,
 )
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QLabel, QWidget
@@ -65,6 +66,8 @@ def _heart_pixmap() -> QPixmap:
 
 class HeartParticles(QObject):
     """Owns a transparent borderless overlay window that animates hearts then destroys itself."""
+
+    finished = Signal()
 
     def __init__(self, center_x: int, center_y: int) -> None:
         super().__init__()
@@ -146,10 +149,16 @@ class HeartParticles(QObject):
             return group
         return group
 
+    def cancel(self) -> None:
+        self._cleanup()
+
     def _cleanup(self) -> None:
         for anim in self._anims:
             anim.stop()
         self._anims.clear()
-        self._overlay.close()
-        self._overlay.deleteLater()
+        if self._overlay is not None:
+            self._overlay.close()
+            self._overlay.deleteLater()
+            self._overlay = None
+        self.finished.emit()
         self.deleteLater()

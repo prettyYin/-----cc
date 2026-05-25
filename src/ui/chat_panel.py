@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from src.ai import persona
 from src.ai.client import ChatWorker
-from src.core import chat_history, config, fonts
+from src.core import chat_history, config, fonts, secrets
 
 
 _PANEL_QSS_TEMPLATE = """
@@ -150,7 +150,10 @@ class ChatPanel(QDialog):
         self._clear_btn.setAutoDefault(False)
         self._clear_btn.setDefault(False)
         self._clear_btn.clicked.connect(self._on_clear)
+        hint = QLabel(f"保留最近 {chat_history.MAX_MESSAGES // 2} 轮，更早的会自动清掉")
+        hint.setStyleSheet("color: #998877; font-size: 10px;")
         bottom_row = QHBoxLayout()
+        bottom_row.addWidget(hint)
         bottom_row.addStretch(1)
         bottom_row.addWidget(self._clear_btn)
 
@@ -180,8 +183,7 @@ class ChatPanel(QDialog):
             self._hide_status()
 
     def _has_api_key(self) -> bool:
-        ai = config.get("ai", {}) or {}
-        return bool(ai.get("api_key"))
+        return bool(secrets.get_api_key())
 
     def _update_input_enabled(self) -> None:
         has_key = self._has_api_key()
@@ -244,6 +246,7 @@ class ChatPanel(QDialog):
         self._current_assistant_bubble = self._add_bubble("assistant", "")
 
         ai_cfg = dict(config.get("ai", {}) or {})
+        ai_cfg["api_key"] = secrets.get_api_key()
         full_messages: list[dict[str, str]] = [
             {"role": "system", "content": persona.build_system_prompt()}
         ]

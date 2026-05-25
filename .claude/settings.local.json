@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd.exe //c \"tasklist | findstr /I python\")",
+      "Bash(pip install *)",
+      "Bash(python -c \"from src.core import config; config.load\\(\\); ai = config.get\\('ai', {}\\); print\\('config.api_key len =', len\\(ai.get\\('api_key',''\\)\\)\\)\")",
+      "Bash(python -c \"import keyring; v = keyring.get_password\\('XiLeDi','openai_api_key'\\); print\\('keyring key len =', len\\(v\\) if v else 'EMPTY'\\)\")",
+      "Bash(tasklist /FI \"IMAGENAME eq pythonw.exe\" /FO CSV 2>nul)"
+    ],
+    "additionalDirectories": [
+      "D:\\DevProject\\小喜桌宠-cc"
+    ]
+  }
+}
