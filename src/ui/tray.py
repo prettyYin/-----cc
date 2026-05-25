@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
-from src.core.paths import assets_dir
+from src.core.paths import icon_path
 from src.pet.placeholder_art import make_placeholder_sheltie
+from src.ui.pixel_art import dewhite_pixmap
 
 
 class PetTrayIcon(QSystemTrayIcon):
@@ -43,9 +44,11 @@ class PetTrayIcon(QSystemTrayIcon):
         self._on_toggle = on_toggle_visibility
 
     def _build_icon(self) -> QIcon:
-        ico_path = assets_dir() / "icons" / "tray.ico"
-        if ico_path.exists():
-            return QIcon(str(ico_path))
+        png = icon_path("tray.png")
+        if png.exists():
+            pm = QPixmap(str(png))
+            if not pm.isNull():
+                return QIcon(dewhite_pixmap(pm))
         return QIcon(make_placeholder_sheltie(64, "idle"))
 
     def _on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:

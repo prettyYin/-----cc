@@ -14,12 +14,13 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QGuiApplication, QPixmap
 from PySide6.QtWidgets import QLabel, QWidget
 
-from src.ui.pixel_art import render_pattern
+from src.core.paths import icon_path
+from src.ui.pixel_art import dewhite_pixmap, render_pattern
 
 
 _BONE_SIZE = 60
-_NEAR_OFFSET_MIN = 80
-_NEAR_OFFSET_MAX = 200
+_NEAR_OFFSET_MIN = 10
+_NEAR_OFFSET_MAX = 50
 _FALL_HEIGHT_PX = 120
 _FALL_DURATION_MS = 500
 
@@ -40,6 +41,16 @@ _BONE_PALETTE = {
 
 
 def _make_bone_pixmap(size: int = _BONE_SIZE) -> QPixmap:
+    png = icon_path("bone.png")
+    if png.exists():
+        pm = QPixmap(str(png))
+        if not pm.isNull():
+            pm = dewhite_pixmap(pm)
+            return pm.scaled(
+                size, size,
+                Qt.KeepAspectRatio,
+                Qt.FastTransformation,
+            )
     scale = max(2, size // 12)
     return render_pattern(_BONE_PATTERN, _BONE_PALETTE, scale=scale, canvas_size=(size, size))
 

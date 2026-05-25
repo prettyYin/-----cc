@@ -12,7 +12,8 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QWidget
 
-from src.ui.pixel_art import render_pattern
+from src.core.paths import icon_path
+from src.ui.pixel_art import dewhite_pixmap, render_pattern
 
 
 _HAND_SIZE = 72
@@ -40,6 +41,16 @@ _HAND_PALETTE = {
 
 
 def _make_hand_pixmap(size: int = _HAND_SIZE) -> QPixmap:
+    png = icon_path("hand.png")
+    if png.exists():
+        pm = QPixmap(str(png))
+        if not pm.isNull():
+            pm = dewhite_pixmap(pm)
+            return pm.scaled(
+                size, size,
+                Qt.KeepAspectRatio,
+                Qt.FastTransformation,
+            )
     scale = max(2, size // 11)
     return render_pattern(_HAND_PATTERN, _HAND_PALETTE, scale=scale, canvas_size=(size, size))
 

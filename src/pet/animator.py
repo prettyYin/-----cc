@@ -10,6 +10,7 @@ from PySide6.QtGui import QPixmap, QTransform
 from src.core.paths import sprites_dir
 from src.pet.placeholder_art import make_placeholder_frame
 from src.pet.state_machine import StateMachine
+from src.ui.pixel_art import dewhite_pixmap
 
 
 _DEFAULT_MANIFEST: dict[str, Any] = {
@@ -19,7 +20,7 @@ _DEFAULT_MANIFEST: dict[str, Any] = {
         "sit":   {"frames": 2, "fps": 2,  "loop": True},
         "sleep": {"frames": 3, "fps": 3,  "loop": True},
         "happy": {"frames": 5, "fps": 12, "loop": True},
-        "dizzy": {"frames": 4, "fps": 8,  "loop": False},
+        "dizzy": {"frames": 4, "fps": 8,  "loop": True},
     }
 }
 
@@ -89,13 +90,15 @@ class Animator(QObject):
                 pm = QPixmap(str(path))
                 if pm.isNull():
                     pm = make_placeholder_frame(state, i, self._size)
-                elif pm.width() != self._size or pm.height() != self._size:
-                    pm = pm.scaled(
-                        self._size,
-                        self._size,
-                        Qt.KeepAspectRatio,
-                        Qt.FastTransformation,
-                    )
+                else:
+                    pm = dewhite_pixmap(pm)
+                    if pm.width() != self._size or pm.height() != self._size:
+                        pm = pm.scaled(
+                            self._size,
+                            self._size,
+                            Qt.KeepAspectRatio,
+                            Qt.FastTransformation,
+                        )
                 frames.append(pm)
             else:
                 frames.append(make_placeholder_frame(state, i, self._size))

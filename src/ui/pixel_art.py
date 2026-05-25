@@ -1,8 +1,10 @@
 """像素画工具：把 ASCII 字符画模式渲染成清晰的 QPixmap（无抗锯齿、整像素块）。"""
 from __future__ import annotations
 
+from collections import deque
+
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 
 def render_pattern(
@@ -58,3 +60,42 @@ def render_pattern(
 
 
 PixelPalette = dict[str, QColor | str]
+
+
+def dewhite_pixmap(pm: QPixmap, tol: int = 16) -> QPixmap:
+    """边缘泛洪去白底：从四角 BFS 把"接近白色（每通道≥255-tol）+ 与边界连通"的像素 alpha 设为 0。
+
+    胸口白毛被棕色描边包围、不与边界连通，不会被误伤。
+    若图像已透明（四角 alpha=0），BFS 立刻终止，等同 no-op。
+    """
+    if pm.isNull():
+        return pm
+    img = pm.toImage().convertToFormat(QImage.Format_ARGB32)
+    w, h = img.width(), img.height()
+    if w == 0 or h == 0:
+        return pm
+
+    threshold = 255 - tol
+    transparent_rgba = QColor(0, 0, 0, 0).rgba()
+
+    visited: set[tuple[int, int]] = set()
+    queue: deque[tuple[int, int]] = deque()
+    for sx, sy in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        queue.append((sx, sy))
+
+    while queue:
+        x, y = queue.popleft()
+        if (x, y) in visited:
+            continue
+        visited.add((x, y))
+        c = QColor(img.pixel(x, y))
+        if c.alpha() == 0:
+            continue
+        if c.red() < threshold or c.green() < threshold or c.blue() < threshold:
+            continue
+        img.setPixel(x, y, transparent_rgba)
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in visited:
+                queue.append((nx, ny))
+
+    return QPixmap.fromImage(img)

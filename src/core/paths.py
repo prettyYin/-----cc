@@ -24,6 +24,14 @@ def sprites_dir() -> Path:
     return assets_dir() / "sprites"
 
 
+def icons_dir() -> Path:
+    return sprites_dir() / "icons"
+
+
+def icon_path(name: str) -> Path:
+    return icons_dir() / name
+
+
 def user_data_dir() -> Path:
     base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
     path = Path(base) / "XiLeDi"

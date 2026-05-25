@@ -15,7 +15,8 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QLabel, QWidget
 
-from src.ui.pixel_art import render_pattern
+from src.core.paths import icon_path
+from src.ui.pixel_art import dewhite_pixmap, render_pattern
 
 
 _HEART_SIZE = 27
@@ -38,6 +39,16 @@ _HEART_PALETTE = {
 
 
 def _make_heart_pixmap(size: int = _HEART_SIZE) -> QPixmap:
+    png = icon_path("heart.png")
+    if png.exists():
+        pm = QPixmap(str(png))
+        if not pm.isNull():
+            pm = dewhite_pixmap(pm)
+            return pm.scaled(
+                size, size,
+                Qt.KeepAspectRatio,
+                Qt.FastTransformation,
+            )
     scale = max(2, size // 9)
     return render_pattern(_HEART_PATTERN, _HEART_PALETTE, scale=scale, canvas_size=(size, size))
 
@@ -76,13 +87,18 @@ class HeartParticles(QObject):
         self._anims: list[QParallelAnimationGroup] = []
 
         pm = _heart_pixmap()
+        left_band_max = int(width * 0.30) - _HEART_SIZE
+        right_band_min = int(width * 0.70)
         for _ in range(_HEART_COUNT):
             label = QLabel(self._overlay)
             label.setPixmap(pm)
             label.setAttribute(Qt.WA_TranslucentBackground, True)
             label.setFixedSize(_HEART_SIZE, _HEART_SIZE)
-            start_x = random.randint(20, width - 20 - _HEART_SIZE)
-            label.move(start_x, height - _HEART_SIZE - 5)
+            if random.random() < 0.5:
+                start_x = random.randint(8, max(8, left_band_max))
+            else:
+                start_x = random.randint(right_band_min, width - 8 - _HEART_SIZE)
+            label.move(start_x, height - _HEART_SIZE - 25)
             opacity = QGraphicsOpacityEffect(label)
             opacity.setOpacity(1.0)
             label.setGraphicsEffect(opacity)
@@ -108,8 +124,8 @@ class HeartParticles(QObject):
 
         move = QPropertyAnimation(label, b"pos")
         move.setDuration(_DURATION_MS - delay_ms)
-        move.setStartValue(QPoint(start_x, height - _HEART_SIZE - 5))
-        move.setEndValue(QPoint(end_x, height - _HEART_SIZE - 5 - rise_dy))
+        move.setStartValue(QPoint(start_x, height - _HEART_SIZE - 25))
+        move.setEndValue(QPoint(end_x, height - _HEART_SIZE - 25 - rise_dy))
         move.setEasingCurve(QEasingCurve.OutQuad)
 
         fade = QPropertyAnimation(opacity, b"opacity")

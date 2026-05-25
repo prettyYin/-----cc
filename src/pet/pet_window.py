@@ -24,6 +24,7 @@ _CLICK_DRAG_THRESHOLD_PX = 3
 _HEAD_RATIO = 0.4
 _PET_DURATION_MS = 1500
 _WAG_DURATION_MS = 500
+_DRAG_RELEASE_DIZZY_MS = 800
 _EDGE_SNAP_THRESHOLD_PX = 64
 _EDGE_VISIBLE_PX = 54
 _SLIDE_DURATION_MS = 320
@@ -137,7 +138,7 @@ class PetWindow(QWidget):
                 if self._slide_anim is not None:
                     self._slide_anim.stop()
                     self._slide_anim = None
-                self._state_machine.transition("idle", force=True)
+                self._state_machine.transition("dizzy", force=True)
         if self._is_dragging:
             new_pos = cur - self._drag_offset
             self.move(new_pos)
@@ -165,7 +166,7 @@ class PetWindow(QWidget):
             else:
                 if was_edge_hidden:
                     self._unhide_from_edge()
-                self._state_machine.transition("dizzy", force=True)
+                QTimer.singleShot(_DRAG_RELEASE_DIZZY_MS, self._return_to_idle_if_dizzy)
         elif was_edge_hidden:
             pass
         elif was_petting:
@@ -216,6 +217,12 @@ class PetWindow(QWidget):
     def _return_to_idle_if_happy(self) -> None:
         if self._state_machine.state() == "happy":
             self._state_machine.transition("idle", force=True)
+
+    def _return_to_idle_if_dizzy(self) -> None:
+        if self._state_machine.state() == "dizzy" and not self._is_dragging:
+            self._state_machine.transition("idle", force=True)
+            if self._behavior.is_paused():
+                self._behavior.resume()
 
     def _trigger_sleep(self) -> None:
         self._cancel_feeding()
