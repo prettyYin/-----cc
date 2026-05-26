@@ -19,6 +19,10 @@ _MOOD_BY_STATE = {
     "sleep": "sleep",
     "happy": "happy",
     "dizzy": "idle",
+    "peek": "idle",
+    "eat": "happy",
+    "hold_bone": "happy",
+    "fall": "idle",
 }
 
 
@@ -117,6 +121,19 @@ def make_placeholder_frame(state: str, frame_idx: int, size: int = 180) -> QPixm
     if state == "dizzy":
         angle = (frame_idx - 1) * 8 - 12
         return _rotate(_add_stars(base, frame_idx, size), angle, size)
+
+    if state == "peek":
+        return _y_offset(base, _breath_offset(frame_idx, 3, 2), size)
+
+    if state == "eat":
+        return _y_offset(base, _bob_offset(frame_idx, 4, 3), size)
+
+    if state == "hold_bone":
+        return _y_offset(base, _bob_offset(frame_idx, 4, 3), size)
+
+    if state == "fall":
+        dy = 8 if frame_idx == 1 else 0
+        return _y_offset(base, dy, size)
 
     return base
 

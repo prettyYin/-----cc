@@ -21,8 +21,17 @@ _DEFAULT_MANIFEST: dict[str, Any] = {
         "sleep": {"frames": 3, "fps": 3,  "loop": True},
         "happy": {"frames": 5, "fps": 12, "loop": True},
         "dizzy": {"frames": 4, "fps": 8,  "loop": True},
+        "peek":  {"frames": 3, "fps": 2,  "loop": True},
+        "eat":   {"frames": 4, "fps": 6,  "loop": True},
+        "hold_bone": {"frames": 4, "fps": 6, "loop": True},
+        "fall":      {"frames": 2, "fps": 6, "loop": False},
     }
 }
+
+
+_OVERSIZED_STATES = {"dizzy"}
+_OVERSIZED_ZOOM = 1.4
+_PEEK_LOOP_END = 2  # peek 只循环 frame_01/02；frame_03 由 play_peek_wave 单次触发
 
 
 class Animator(QObject):
@@ -44,6 +53,11 @@ class Animator(QObject):
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._on_tick)
+
+        self._peek_wave_active = False
+        self._peek_wave_timer = QTimer(self)
+        self._peek_wave_timer.setSingleShot(True)
+        self._peek_wave_timer.timeout.connect(self._end_peek_wave)
 
         self._sm.state_changed.connect(self._on_state_changed)
         self._start_timer_for(self._sm.state())
@@ -92,41 +106,80 @@ class Animator(QObject):
                     pm = make_placeholder_frame(state, i, self._size)
                 else:
                     pm = dewhite_pixmap(pm)
-                    if pm.width() != self._size or pm.height() != self._size:
-                        pm = pm.scaled(
-                            self._size,
-                            self._size,
-                            Qt.KeepAspectRatio,
-                            Qt.FastTransformation,
-                        )
+                    pm = self._fit_sprite(pm, state)
                 frames.append(pm)
             else:
                 frames.append(make_placeholder_frame(state, i, self._size))
         return frames
+
+    def _fit_sprite(self, pm: QPixmap, state: str) -> QPixmap:
+        if state in _OVERSIZED_STATES:
+            target = int(self._size * _OVERSIZED_ZOOM)
+            if pm.width() == target and pm.height() == target:
+                return pm
+            return pm.scaled(target, target, Qt.KeepAspectRatio, Qt.FastTransformation)
+        if pm.width() == self._size and pm.height() == self._size:
+            return pm
+        return pm.scaled(
+            self._size,
+            self._size,
+            Qt.KeepAspectRatio,
+            Qt.FastTransformation,
+        )
 
     def _start_timer_for(self, state: str) -> None:
         conf = self._manifest["states"].get(state, {})
         fps = max(1, int(conf.get("fps", 8)))
         self._timer.start(max(16, int(1000 / fps)))
 
+    def play_peek_wave(self, duration_ms: int = 1500) -> None:
+        """临时切到 peek/frame_03 显示一段时间，再回到 frame_01/02 循环。"""
+        if self._sm.state() != "peek":
+            return
+        frames = self._frames.get("peek", [])
+        if len(frames) < 3:
+            return
+        self._peek_wave_active = True
+        self._timer.stop()
+        self._current_frame_idx = 2
+        self._emit_current()
+        self._peek_wave_timer.start(max(200, int(duration_ms)))
+
+    def _end_peek_wave(self) -> None:
+        self._peek_wave_active = False
+        if self._sm.state() != "peek":
+            return
+        self._current_frame_idx = 0
+        self._start_timer_for("peek")
+        self._emit_current()
+
     def _on_state_changed(self, _old: str, new: str) -> None:
+        if _old == "peek" and new != "peek":
+            self._peek_wave_active = False
+            self._peek_wave_timer.stop()
         self._current_frame_idx = 0
         self._start_timer_for(new)
         self._emit_current()
 
     def _on_tick(self) -> None:
         state = self._sm.state()
+        if self._peek_wave_active and state == "peek":
+            return
         frames = self._frames.get(state, [])
         if not frames:
             return
         conf = self._manifest["states"].get(state, {})
+        if state == "peek":
+            max_count = min(_PEEK_LOOP_END, len(frames))
+        else:
+            max_count = len(frames)
         next_idx = self._current_frame_idx + 1
-        if next_idx >= len(frames):
+        if next_idx >= max_count:
             if conf.get("loop", True):
                 self._current_frame_idx = 0
                 self._emit_current()
             else:
-                self._current_frame_idx = len(frames) - 1
+                self._current_frame_idx = max_count - 1
                 self._timer.stop()
                 self.animation_finished.emit(state)
         else:

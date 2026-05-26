@@ -13,7 +13,8 @@ def build_pet_menu(
     parent: QWidget,
     *,
     on_pet: Callable[[], None],
-    on_feed: Callable[[], None],
+    on_feed_bone: Callable[[], None],
+    on_feed_dogfood: Callable[[], None],
     on_sleep: Callable[[], None],
     on_chat: Callable[[], None],
     on_reminders: Callable[[], None],
@@ -32,7 +33,17 @@ def build_pet_menu(
         menu.addAction(action)
 
     add("抚摸", on_pet)
-    add("喂食", on_feed)
+
+    feed_menu = menu.addMenu("喂食")
+    feed_menu.setFont(fonts.pixel_font(11))
+    feed_menu.setStyleSheet(_MENU_QSS_TEMPLATE.format(family=fonts.family_css()))
+    bone_action = QAction("🦴 骨头", parent)
+    bone_action.triggered.connect(on_feed_bone)
+    feed_menu.addAction(bone_action)
+    dogfood_action = QAction("🥣 狗粮", parent)
+    dogfood_action.triggered.connect(on_feed_dogfood)
+    feed_menu.addAction(dogfood_action)
+
     add("睡觉", on_sleep)
     menu.addSeparator()
     add("聊天", on_chat)

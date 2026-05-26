@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# PyInstaller 中间产物（spec 文件本身要 commit）
+build/build/
+build/dist/
+build/*.spec.bak
+build/__pycache__/
+dist/
+
+# Inno Setup 产物（installer.iss 要 commit）
+build/Output/
+build/installer/*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# 本地配置（避免误提交）
+*.local.json
+.env
+
+# 日志
+*.log

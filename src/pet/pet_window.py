@@ -27,16 +27,24 @@ from src.ui.progress_ring import ProgressRing
 from src.ui.settings_dialog import SettingsDialog
 
 
-PET_SIZE = 160
+PET_SIZE = 128
 
 _CLICK_DRAG_THRESHOLD_PX = 3
 _HEAD_RATIO = 0.4
 _PET_DURATION_MS = 1500
 _WAG_DURATION_MS = 500
-_DRAG_RELEASE_DIZZY_MS = 800
+_DRAG_RELEASE_FALL_MS = 350
 _EDGE_SNAP_THRESHOLD_PX = 64
-_EDGE_VISIBLE_PX = 54
+_EDGE_VISIBLE_PX = 90
 _SLIDE_DURATION_MS = 320
+
+_OVERSIZED_STATES = {"dizzy"}
+_OVERSIZED_PET_SIZE = int(PET_SIZE * 1.4)  # 179
+_OVERSIZED_OFFSET = (_OVERSIZED_PET_SIZE - PET_SIZE) // 2  # 25
+
+_PEEK_WAVE_INTERVAL_MIN_MS = 18_000
+_PEEK_WAVE_INTERVAL_MAX_MS = 35_000
+_PEEK_WAVE_DURATION_MS = 1500
 
 _FOCUS_ENCOURAGE_INTERVAL_MS = 5 * 60 * 1000
 _FOCUS_ENCOURAGE_MIN_REMAIN_S = 360
@@ -97,6 +105,9 @@ class PetWindow(QWidget):
         self._focus_lock: bool = False
         self._focus_warned: bool = False
         self._focus_encourage_timer: QTimer | None = None
+        self._peek_wave_timer: QTimer | None = None
+
+        self._state_machine.state_changed.connect(self._on_state_changed_for_size)
 
         self.apply_config()
         self._move_to_screen_corner()
@@ -236,7 +247,8 @@ class PetWindow(QWidget):
             else:
                 if was_edge_hidden:
                     self._unhide_from_edge()
-                QTimer.singleShot(_DRAG_RELEASE_DIZZY_MS, self._return_to_idle_if_dizzy)
+                self._state_machine.transition("fall", force=True)
+                QTimer.singleShot(_DRAG_RELEASE_FALL_MS, self._return_to_idle_if_fall_or_dizzy)
         elif was_edge_hidden:
             pass
         elif was_petting:
@@ -255,8 +267,10 @@ class PetWindow(QWidget):
 
     def contextMenuEvent(self, event) -> None:
         self._notify_interaction()
-        self._behavior.pause()
-        self._state_machine.transition("idle", force=True)
+        if self._edge_hidden is None:
+            self._behavior.pause()
+            self._cancel_feeding()
+            self._state_machine.transition("idle", force=True)
         pomo_cfg = config.get("pomodoro", {}) or {}
         pomo_enabled = bool(pomo_cfg.get("enabled", False))
         pomo_running = self._pomodoro is not None and self._pomodoro.is_running()
@@ -264,7 +278,8 @@ class PetWindow(QWidget):
         menu = build_pet_menu(
             self,
             on_pet=self._trigger_pet,
-            on_feed=self._trigger_feed,
+            on_feed_bone=self._trigger_feed_bone,
+            on_feed_dogfood=self._trigger_feed_dogfood,
             on_sleep=self._trigger_sleep,
             on_chat=self._open_chat,
             on_reminders=lambda: self._open_settings(initial_tab=3),
@@ -277,15 +292,45 @@ class PetWindow(QWidget):
         menu.exec(event.globalPos())
 
     def _resume_behavior_if_not_focused(self) -> None:
+        if self._edge_hidden is not None:
+            return
         if self._focus_lock:
             self._state_machine.transition("sleep", force=True)
             return
+        if self._state_machine.state() in ("eat", "hold_bone", "happy"):
+            return
         self._behavior.resume()
+
+    def _on_state_changed_for_size(self, old: str, new: str) -> None:
+        """dizzy 帧用 1.4× 大画布显示（避免上下被裁），进出时同步缩放窗口 + label。"""
+        new_oversized = new in _OVERSIZED_STATES
+        old_oversized = old in _OVERSIZED_STATES
+        if new_oversized == old_oversized:
+            return
+        if new_oversized:
+            delta = -_OVERSIZED_OFFSET
+            target_size = _OVERSIZED_PET_SIZE
+        else:
+            delta = _OVERSIZED_OFFSET
+            target_size = PET_SIZE
+        new_x = self.x() + delta
+        new_y = self.y() + delta
+        self.setFixedSize(target_size, target_size)
+        self._label.setGeometry(0, 0, target_size, target_size)
+        self.move(new_x, new_y)
+        if self._drag_offset is not None:
+            self._drag_offset = self._drag_offset - QPoint(delta, delta)
+        self._behavior.sync_position(new_x, new_y)
+        if self._progress_ring is not None:
+            self._progress_ring.setGeometry(target_size - 56, 8, 48, 48)
 
     # --- Interaction actions --------------------------------------------
 
     def _trigger_pet(self) -> None:
         self._notify_interaction()
+        if self._edge_hidden is not None:
+            self._show_bubble("我躲在墙边啦~ 把我拖出来再摸嘛 🐾")
+            return
         self._cancel_feeding()
         self._state_machine.transition("happy", force=True)
         head_x = self.x() + PET_SIZE // 2
@@ -319,29 +364,69 @@ class PetWindow(QWidget):
                 if self._behavior.is_paused():
                     self._behavior.resume()
 
+    def _return_to_idle_if_fall_or_dizzy(self) -> None:
+        if self._state_machine.state() in ("fall", "dizzy") and not self._is_dragging:
+            if self._focus_lock:
+                self._state_machine.transition("sleep", force=True)
+            else:
+                self._state_machine.transition("idle", force=True)
+                if self._behavior.is_paused():
+                    self._behavior.resume()
+
     def _trigger_sleep(self) -> None:
         self._notify_interaction()
+        if self._edge_hidden is not None:
+            self._show_bubble("墙边不好睡觉~ 把我拽出来嘛 😴")
+            return
         self._cancel_feeding()
         self._state_machine.transition("sleep", force=True)
 
-    def _trigger_feed(self) -> None:
+    def _trigger_feed_bone(self) -> None:
         self._notify_interaction()
-        self._cancel_feeding()
+        if self._edge_hidden is not None:
+            self._show_bubble("墙边吃不下骨头啦~ 先把我拽出来 🦴")
+            return
         if self._focus_lock:
             self._show_bubble("学习中喂不下啦~ 等休息再吃 🦴")
             return
+        self._start_feeding("bone")
+
+    def _trigger_feed_dogfood(self) -> None:
+        self._notify_interaction()
+        if self._edge_hidden is not None:
+            self._show_bubble("墙边放不下狗粮碗啦~ 先把我拽出来 🥣")
+            return
+        if self._focus_lock:
+            self._show_bubble("学习中喂不下啦~ 等休息再吃 🥣")
+            return
+        self._start_feeding("dogfood")
+
+    def _start_feeding(self, food_type: str) -> None:
+        self._cancel_feeding()
         self._behavior.resume()
-        self._feeding = FeedingController(
+        controller = FeedingController(
             pet_size=PET_SIZE,
             behavior=self._behavior,
             state_machine=self._state_machine,
+            animator=self._animator,
             on_arrive_sound=lambda: audio.play("chew"),
         )
-        self._feeding.destroyed.connect(self._on_feeding_done)
-        self._feeding.start(self.x(), self.y())
+        controller.destroyed.connect(
+            lambda *_, ref=controller: self._on_feeding_destroyed(ref)
+        )
+        controller.eating_finished.connect(self._on_feeding_finished)
+        self._feeding = controller
+        controller.start(self.x(), self.y(), food_type=food_type)
 
-    def _on_feeding_done(self, *_args) -> None:
-        self._feeding = None
+    def _on_feeding_destroyed(self, ref) -> None:
+        if self._feeding is ref:
+            self._feeding = None
+
+    def _on_feeding_finished(self, food_type: str) -> None:
+        if not food_type:
+            return
+        if self._chatter is not None:
+            self._chatter.say_event(f"after_feed_{food_type}")
 
     def _cancel_feeding(self) -> None:
         if self._feeding is not None:
@@ -350,6 +435,9 @@ class PetWindow(QWidget):
 
     def _open_chat(self) -> None:
         self._notify_interaction()
+        if self._edge_hidden is not None:
+            self._show_bubble("我躲在墙边呢~ 把我拽出来再聊嘛 💬")
+            return
         self._cancel_feeding()
         if self._chat_panel is None:
             self._chat_panel = ChatPanel(self)
@@ -377,14 +465,21 @@ class PetWindow(QWidget):
 
     # --- Edge snap (Bug 7) ----------------------------------------------
 
+    def _logical_pos(self) -> tuple[int, int]:
+        """dizzy 时窗口被向左上偏移 _OVERSIZED_OFFSET 像素，还原成逻辑（PET_SIZE 视角）位置。"""
+        if self._state_machine.state() in _OVERSIZED_STATES:
+            return self.x() + _OVERSIZED_OFFSET, self.y() + _OVERSIZED_OFFSET
+        return self.x(), self.y()
+
     def _should_snap_to_edge(self) -> bool:
         screen = QGuiApplication.primaryScreen()
         if screen is None:
             return False
         geo = screen.availableGeometry()
-        if self.x() < geo.left() + _EDGE_SNAP_THRESHOLD_PX:
+        lx, _ly = self._logical_pos()
+        if lx < geo.left() + _EDGE_SNAP_THRESHOLD_PX:
             return True
-        if self.x() + PET_SIZE > geo.right() - _EDGE_SNAP_THRESHOLD_PX:
+        if lx + PET_SIZE > geo.right() - _EDGE_SNAP_THRESHOLD_PX:
             return True
         return False
 
@@ -393,19 +488,19 @@ class PetWindow(QWidget):
         if screen is None:
             return
         geo = screen.availableGeometry()
-        if self.x() < geo.left() + _EDGE_SNAP_THRESHOLD_PX:
+        lx, ly = self._logical_pos()
+        if lx < geo.left() + _EDGE_SNAP_THRESHOLD_PX:
             self._edge_hidden = "left"
             target_x = geo.left() - PET_SIZE + _EDGE_VISIBLE_PX
-            self._animator.set_direction(1)
+            self._animator.set_direction(-1)
         else:
             self._edge_hidden = "right"
             target_x = geo.right() - _EDGE_VISIBLE_PX
-            self._animator.set_direction(-1)
-        target_y = self.y()
-        target_y = max(geo.top(), min(geo.bottom() - PET_SIZE, target_y))
+            self._animator.set_direction(1)
+        target_y = max(geo.top(), min(geo.bottom() - PET_SIZE, ly))
 
         self._behavior.pause()
-        self._state_machine.transition("idle", force=True)
+        self._state_machine.transition("peek", force=True)
 
         if self._slide_anim is not None:
             self._slide_anim.stop()
@@ -419,10 +514,43 @@ class PetWindow(QWidget):
 
     def _on_snap_finished(self) -> None:
         self._behavior.sync_position(self.x(), self.y())
+        self._start_peek_wave_loop()
 
     def _unhide_from_edge(self) -> None:
+        self._stop_peek_wave_loop()
         self._edge_hidden = None
+        if self._state_machine.state() == "peek":
+            self._state_machine.transition("idle", force=True)
         self._behavior.resume()
+
+    # --- Peek wave (M4.9 四轮) ------------------------------------------
+
+    def _start_peek_wave_loop(self) -> None:
+        if self._peek_wave_timer is None:
+            self._peek_wave_timer = QTimer(self)
+            self._peek_wave_timer.setSingleShot(True)
+            self._peek_wave_timer.timeout.connect(self._fire_peek_wave)
+        self._schedule_next_peek_wave()
+
+    def _schedule_next_peek_wave(self) -> None:
+        if self._peek_wave_timer is None:
+            return
+        delay = random.randint(_PEEK_WAVE_INTERVAL_MIN_MS, _PEEK_WAVE_INTERVAL_MAX_MS)
+        self._peek_wave_timer.start(delay)
+
+    def _fire_peek_wave(self) -> None:
+        if self._edge_hidden is None:
+            return
+        self._animator.play_peek_wave(_PEEK_WAVE_DURATION_MS)
+        if self._chatter is not None:
+            phrase = self._chatter.pick_phrase("peek_wave")
+            if phrase:
+                self._show_bubble(phrase)
+        self._schedule_next_peek_wave()
+
+    def _stop_peek_wave_loop(self) -> None:
+        if self._peek_wave_timer is not None:
+            self._peek_wave_timer.stop()
 
     # --- Reminder bubble (M4) -------------------------------------------
 

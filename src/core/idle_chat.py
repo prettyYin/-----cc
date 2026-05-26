@@ -24,7 +24,8 @@ def _load_phrases() -> dict[str, list[str]]:
         print(f"[idle_chat] 语料加载失败：{exc}")
         return {"default": ["汪~"]}
     out: dict[str, list[str]] = {}
-    for key in ("default", "morning", "evening", "night", "encourage"):
+    for key in ("default", "morning", "evening", "night", "encourage",
+                "after_feed_bone", "after_feed_dogfood", "peek_wave"):
         items = data.get(key)
         if isinstance(items, list) and items:
             out[key] = [str(s) for s in items if isinstance(s, str)]
@@ -93,6 +94,21 @@ class IdleChatter(QObject):
 
     def set_visible(self, visible: bool) -> None:
         self._visible = visible
+
+    def say_event(self, category: str) -> None:
+        bucket = self._phrases.get(category)
+        if not bucket:
+            return
+        phrase = random.choice(bucket)
+        self.phrase_ready.emit(phrase)
+        self._last_interact_at = datetime.now()
+
+    def pick_phrase(self, category: str) -> str | None:
+        """从某类语料里直接挑一句，不走 phrase_ready 信号，由调用方决定怎么显示。"""
+        bucket = self._phrases.get(category)
+        if not bucket:
+            return None
+        return random.choice(bucket)
 
     def _tick(self) -> None:
         if self._paused or not self._visible:

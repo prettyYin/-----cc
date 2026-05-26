@@ -4,26 +4,34 @@ from __future__ import annotations
 from PySide6.QtCore import QElapsedTimer, QObject, Signal
 
 
-STATES = ("idle", "walk", "sit", "sleep", "happy", "dizzy")
+STATES = ("idle", "walk", "sit", "sleep", "happy", "dizzy", "peek", "eat", "hold_bone", "fall")
 
 
 _VALID_TRANSITIONS: dict[str, set[str]] = {
-    "idle":  {"walk", "sit", "sleep", "happy", "dizzy"},
-    "walk":  {"idle", "happy", "dizzy"},
-    "sit":   {"idle", "happy", "dizzy"},
-    "sleep": {"idle", "dizzy"},
-    "happy": {"idle", "dizzy"},
-    "dizzy": {"idle"},
+    "idle":      {"walk", "sit", "sleep", "happy", "dizzy", "peek", "eat", "hold_bone", "fall"},
+    "walk":      {"idle", "happy", "dizzy", "eat", "hold_bone"},
+    "sit":       {"idle", "happy", "dizzy", "eat", "hold_bone"},
+    "sleep":     {"idle", "dizzy"},
+    "happy":     {"idle", "dizzy"},
+    "dizzy":     {"idle", "fall"},
+    "peek":      {"idle", "dizzy"},
+    "eat":       {"idle", "happy", "dizzy"},
+    "hold_bone": {"idle", "happy", "dizzy"},
+    "fall":      {"idle", "dizzy"},
 }
 
 
 _MIN_DURATION_MS: dict[str, int] = {
-    "idle":  300,
-    "walk":  500,
-    "sit":   500,
-    "sleep": 1000,
-    "happy": 500,
-    "dizzy": 500,
+    "idle":      300,
+    "walk":      500,
+    "sit":       500,
+    "sleep":     1000,
+    "happy":     500,
+    "dizzy":     500,
+    "peek":      300,
+    "eat":       500,
+    "hold_bone": 500,
+    "fall":      100,
 }
 
 

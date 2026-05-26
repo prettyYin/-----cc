@@ -5,6 +5,10 @@
     "sit":   {"frames": 2, "fps": 2,  "loop": true},
     "sleep": {"frames": 3, "fps": 3,  "loop": true},
     "happy": {"frames": 5, "fps": 12, "loop": true},
-    "dizzy": {"frames": 4, "fps": 8,  "loop": true}
+    "dizzy": {"frames": 4, "fps": 8,  "loop": true},
+    "peek":  {"frames": 3, "fps": 2,  "loop": true},
+    "eat":   {"frames": 4, "fps": 6,  "loop": true},
+    "hold_bone": {"frames": 4, "fps": 6, "loop": true},
+    "fall":      {"frames": 2, "fps": 6, "loop": false}
   }
 }
