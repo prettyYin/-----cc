@@ -34,7 +34,7 @@
 
 ## 安装（普通用户）
 
-1. 到 [Releases](https://github.com/prettyYin/-----cc/releases) 下载最新 `XiLeDi-Setup-1.0.0.exe`（74 MB）
+1. 到 [Releases](https://github.com/prettyYin/desktop-pet/releases) 下载最新 `XiLeDi-Setup-1.0.0.exe`（74 MB）
 2. 双击运行，中文向导一路下一步（默认装到 `%LOCALAPPDATA%\Programs\XiLeDi`，免 UAC）
 3. 完成页勾选"立即启动"即可见到小喜出现在桌面右下角
 
@@ -55,7 +55,7 @@
 ### 启动
 
 ```bash
-git clone https://github.com/prettyYin/-----cc.git
+git clone https://github.com/prettyYin/desktop-pet.git
 cd 小喜桌宠-cc
 
 # 安装依赖
